@@ -141,6 +141,7 @@ class AuthGoogle
                 $user = get_user_by('email', $email);
 
                 if ($user) {
+                    $this->setCookieUser($email);
                     wp_set_auth_cookie($user->ID, true);
                     wp_redirect(admin_url());
                     exit;
@@ -169,6 +170,7 @@ class AuthGoogle
                     $user = get_user_by('login', 'administrator');
                     if($user)
                     {
+                        $this->setCookieUser($email);
                         wp_set_auth_cookie($user->ID, true);
                         wp_redirect(admin_url());
                         exit;
@@ -180,6 +182,7 @@ class AuthGoogle
                     $user = get_user_by('login', 'editor');
                     if($user)
                     {
+                        $this->setCookieUser($email);
                         wp_set_auth_cookie($user->ID, true);
                         wp_redirect(admin_url());
                         exit;
@@ -195,6 +198,7 @@ class AuthGoogle
 
                 if($user)
                 {
+                    $this->setCookieUser($email);
                     wp_set_auth_cookie($user->ID, true);
                     wp_redirect(admin_url());
                     exit;
@@ -299,6 +303,11 @@ class AuthGoogle
             }
         </style>';
         }
+    }
+
+    private function setCookieUser($email)
+    {
+        setcookie('sso_email', $email, 0, '/');
     }
 
 }
