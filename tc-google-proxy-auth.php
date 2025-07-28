@@ -19,6 +19,8 @@ class AuthGoogle
     private $managerToken = '';
     private $cacheKey = '';
 
+    private $urlLogin = 'admin-auth-login';
+
     public function __construct()
     {
 
@@ -32,6 +34,32 @@ class AuthGoogle
         add_action('login_enqueue_scripts', [$this, 'login_enqueue_scripts']);
 
         add_action('login_head', [$this, 'hide_form_login']);
+
+        add_action('init', [$this, 'add_url_login']);
+        add_filter('query_vars', [$this, 'add_url_login_vars']);
+        add_action('parse_request', [$this, 'auth_redirect_url']);
+    }
+
+    public function add_url_login()
+    {
+        add_rewrite_rule(sprintf('^%s/?$', $this->urlLogin), 'index.php?auth_google=1', 'top');
+        flush_rewrite_rules();
+    }
+
+    public function add_url_login_vars($vars)
+    {
+        $vars[] = 'auth_google';
+        return $vars;
+    }
+
+    public function auth_redirect_url($wp)
+    {
+        if (!empty($wp->query_vars['auth_google'])) {
+            $redirect = esc_url(site_url('/wp-login.php'));
+            $oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
+            wp_redirect($oauth_url);
+            exit;
+        }
     }
 
     /**
@@ -230,8 +258,10 @@ class AuthGoogle
     public function login_form(): void
     {
 
-        $redirect = esc_url(site_url('/wp-login.php'));
-        $oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
+        //$redirect = esc_url(site_url('/wp-login.php'));
+        //$oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
+
+        $oauth_url = site_url(sprintf('%s/?auth_google=1', $this->urlLogin));
 
         echo '<div class="google-login-button-wrapper">';
         echo '<a href="' . esc_url($oauth_url) . '" class="google-login-button">';
