@@ -3,14 +3,13 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Traffic Connect
  */
 
-defined('ABSPATH') || exit;
+defined( 'ABSPATH' ) || exit;
 
-class AuthGoogle
-{
+class AuthGoogle {
 
     private $token = '';
     private $urlRedirect = '';
@@ -19,47 +18,21 @@ class AuthGoogle
     private $managerToken = '';
     private $cacheKey = '';
 
-    private $urlLogin = 'admin-auth-login';
-
-    public function __construct()
-    {
-
+    public function __construct() {
+        //
     }
 
-    public function init()
-    {
-        add_action('init', [$this, 'oauth_init']);
-        add_action('login_form', [$this, 'login_form']);
-        add_action('login_message', [$this, 'login_message']);
-        add_action('login_enqueue_scripts', [$this, 'login_enqueue_scripts']);
-
-        add_action('login_head', [$this, 'hide_form_login']);
-
-        add_action('init', [$this, 'add_url_login']);
-        add_filter('query_vars', [$this, 'add_url_login_vars']);
-        add_action('parse_request', [$this, 'auth_redirect_url']);
-    }
-
-    public function add_url_login()
-    {
-        add_rewrite_rule(sprintf('^%s/?$', $this->urlLogin), 'index.php?auth_google=1', 'top');
-        flush_rewrite_rules();
-    }
-
-    public function add_url_login_vars($vars)
-    {
-        $vars[] = 'auth_google';
-        return $vars;
-    }
-
-    public function auth_redirect_url($wp)
-    {
-        if (!empty($wp->query_vars['auth_google'])) {
-            $redirect = esc_url(site_url('/wp-login.php'));
-            $oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
-            wp_redirect($oauth_url);
-            exit;
-        }
+    /**
+     * Initialize plugin hooks and actions
+     *
+     * @return void
+     */
+    public function init() {
+        add_action( 'init', array( $this, 'oauth_init' ) );
+        add_action( 'login_form', array( $this, 'login_form' ) );
+        add_action( 'login_message', array( $this, 'login_message' ) );
+        add_action( 'login_enqueue_scripts', array( $this, 'login_enqueue_scripts' ) );
+        add_action( 'login_head', array( $this, 'hide_form_login' ) );
     }
 
     /**
@@ -67,7 +40,7 @@ class AuthGoogle
      *
      * @return void
      */
-    public function login_enqueue_scripts(){
+    public function login_enqueue_scripts() {
         ?>
         <style>
             #login_error {
@@ -131,145 +104,153 @@ class AuthGoogle
      * @param string $message The original login message.
      * @return string The modified or original login message.
      */
-    public function login_message($message)
-    {
-        if (isset($_GET['error']))
-        {
-            $error = sanitize_text_field($_GET['error']);
-            return '<div id="login_error">' . esc_html($error) . '</div>';
+    public function login_message( $message ) {
+        if ( isset( $_GET['error'] ) ) {
+            $error = sanitize_text_field( $_GET['error'] );
+            return '<div id="login_error">' . esc_html( $error ) . '</div>';
         }
         return $message;
     }
 
     /**
+     * Handle OAuth authentication process and proxy redirect
+     *
      * @return void
      */
-    public function oauth_init(): void
-    {
-        if (is_user_logged_in()) return;
+    public function oauth_init() {
+        // PROXY ENDPOINT - redirect to real OAuth URL
+        if ( isset( $_GET['tc_oauth_start'] ) && $_GET['tc_oauth_start'] === '1' ) {
 
-        if (isset($_GET['oauth_token']))
-        {
+            // Check nonce for security
+            if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'tc_oauth_proxy' ) ) {
+                wp_die( 'Security check failed' );
+            }
 
-            //Get Email
-            $email = $this->decryptToken($_GET['oauth_token']);
+            $redirect = isset( $_GET['redirect'] ) ? sanitize_url( $_GET['redirect'] ) : site_url( '/wp-login.php' );
 
-            //Get Role
-            $role = $this->decryptToken($_GET['role']);
+            // Get OAuth URL and redirect
+            $real_oauth_url = sprintf( '%s?redirect=%s', $this->urlRedirect, urlencode( $redirect ) );
 
-            //Get Teams
-            $teams = $this->decryptToken($_GET['teams']);
-            $teams = explode(',', $teams);
+            wp_redirect( $real_oauth_url );
+            exit;
+        }
 
+        if ( is_user_logged_in() ) {
+            return;
+        }
 
-            $api = get_transient($this->cacheKey);
+        if ( isset( $_GET['oauth_token'] ) ) {
 
-            if ($email && str_ends_with($email, sprintf('@%s', $this->accessDomain)))
-            {
-                $user = get_user_by('email', $email);
+            // Get Email
+            $email = $this->decrypt_token( $_GET['oauth_token'] );
 
-                if ($user) {
-                    $this->setCookieUser($email);
-                    wp_set_auth_cookie($user->ID, true);
-                    wp_redirect(admin_url());
+            // Get Role
+            $role = $this->decrypt_token( $_GET['role'] );
+
+            // Get Teams
+            $teams = $this->decrypt_token( $_GET['teams'] );
+            $teams = explode( ',', $teams );
+
+            $api = get_transient( $this->cacheKey );
+
+            if ( $email && str_ends_with( $email, sprintf( '@%s', $this->accessDomain ) ) ) {
+                $user = get_user_by( 'email', $email );
+
+                if ( $user ) {
+                    $this->set_cookie_user( $email );
+                    wp_set_auth_cookie( $user->ID, true );
+                    wp_redirect( admin_url() );
                     exit;
                 }
 
-                if(is_null($api) || empty($api) || !isset($api['team']))
-                {
-                    wp_redirect(site_url('/wp-login.php?error=' . urlencode('The site is not in the manager software.')));
+                if ( is_null( $api ) || empty( $api ) || ! isset( $api['team'] ) ) {
+                    wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The site is not in the manager software.' ) ) );
                     exit;
                 }
 
-                if(empty($teams) || !in_array($api['team'], $teams))
-                {
-                    wp_redirect(site_url('/wp-login.php?error=' . urlencode('The command doesn\'t match')));
+                if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
+                    wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match' ) ) );
                     exit;
                 }
 
-                if(empty($role))
-                {
-                    wp_redirect(site_url('/wp-login.php?error=' . urlencode('Role not found')));
+                if ( empty( $role ) ) {
+                    wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Role not found' ) ) );
                     exit;
                 }
 
-                if($role == 'administrator')
-                {
-                    $user = get_user_by('login', 'administrator');
-                    if($user)
-                    {
-                        $this->setCookieUser($email);
-                        wp_set_auth_cookie($user->ID, true);
-                        wp_redirect(admin_url());
+                if ( $role == 'administrator' ) {
+                    $user = get_user_by( 'login', 'administrator' );
+                    if ( $user ) {
+                        $this->set_cookie_user( $email );
+                        wp_set_auth_cookie( $user->ID, true );
+                        wp_redirect( admin_url() );
                         exit;
                     }
                 }
 
-                if($role == 'editor')
-                {
-                    $user = get_user_by('login', 'editor');
-                    if($user)
-                    {
-                        $this->setCookieUser($email);
-                        wp_set_auth_cookie($user->ID, true);
-                        wp_redirect(admin_url());
+                if ( $role == 'editor' ) {
+                    $user = get_user_by( 'login', 'editor' );
+                    if ( $user ) {
+                        $this->set_cookie_user( $email );
+                        wp_set_auth_cookie( $user->ID, true );
+                        wp_redirect( admin_url() );
                         exit;
                     }
                 }
 
-                $users = get_users([
+                $users = get_users( array(
                     'number' => 1,
                     'orderby' => 'user_registered',
                     'order' => 'ASC',
-                ]);
+                ) );
                 $user = $users[0] ?? null;
 
-                if($user)
-                {
-                    $this->setCookieUser($email);
-                    wp_set_auth_cookie($user->ID, true);
-                    wp_redirect(admin_url());
+                if ( $user ) {
+                    $this->set_cookie_user( $email );
+                    wp_set_auth_cookie( $user->ID, true );
+                    wp_redirect( admin_url() );
                     exit;
-
                 }
 
-                wp_redirect(site_url('/wp-login.php?error=' . urlencode('Unknown error. Please contact your administrator.')));
+                wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Unknown error. Please contact your administrator.' ) ) );
                 exit;
 
             } else {
 
-                wp_redirect(site_url('/wp-login.php?error=' . urlencode('Invalid email.')));
+                wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Invalid email.' ) ) );
                 exit;
 
             }
         }
 
-
-        if (isset($_GET['error'])) {
-            add_filter('login_errors', function () {
-                return sanitize_text_field($_GET['error']);
-            });
+        if ( isset( $_GET['error'] ) ) {
+            add_filter( 'login_errors', function () {
+                return sanitize_text_field( $_GET['error'] );
+            } );
         }
     }
 
     /**
+     * Display Google login button with proxy URL
+     *
      * @return void
      */
-    public function login_form(): void
-    {
+    public function login_form() {
+        $redirect = esc_url( site_url( '/wp-login.php' ) );
 
-        //$redirect = esc_url(site_url('/wp-login.php'));
-        //$oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
-
-        $oauth_url = site_url(sprintf('%s/?auth_google=1', $this->urlLogin));
+        // Create proxy URL with nonce for security
+        $proxy_url = add_query_arg( array(
+            'tc_oauth_start' => '1',
+            'redirect' => urlencode( $redirect ),
+            '_wpnonce' => wp_create_nonce( 'tc_oauth_proxy' )
+        ), site_url( '/' ) );
 
         echo '<div class="google-login-button-wrapper">';
-        echo '<a href="' . esc_url($oauth_url) . '" class="google-login-button">';
+        echo '<a href="' . esc_url( $proxy_url ) . '" class="google-login-button">';
         echo '<img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />';
         echo '<span>Войти через Google</span>';
         echo '</a>';
         echo '</div>';
-
     }
 
     /**
@@ -278,66 +259,74 @@ class AuthGoogle
      * @param string $token The base64 encoded token to decrypt.
      * @return string|false The decrypted string if successful, or false on failure.
      */
-    private function decryptToken($token): bool|string
-    {
+    private function decrypt_token( $token ) {
         $key = $this->token;
-        $iv = substr($key, 0, 16);
+        $iv = substr( $key, 0, 16 );
 
-        $decoded = base64_decode($token);
-        if (!$decoded) return false;
+        $decoded = base64_decode( $token );
+        if ( ! $decoded ) {
+            return false;
+        }
 
-        return openssl_decrypt($decoded, 'aes-256-cbc', $key, 0, $iv);
+        return openssl_decrypt( $decoded, 'aes-256-cbc', $key, 0, $iv );
     }
 
-    public function hide_form_login()
-    {
-
+    /**
+     * Hide default login form elements for SSO
+     *
+     * @return void
+     */
+    public function hide_form_login() {
         $site_url = site_url();
-        $domain = parse_url($site_url, PHP_URL_HOST);
+        $domain = parse_url( $site_url, PHP_URL_HOST );
 
-        //delete_transient($this->cacheKey);
-        $api = get_transient($this->cacheKey);
+        $api = get_transient( $this->cacheKey );
 
-        if (is_null($api) || empty($api))
-        {
-            $url = sprintf('%s/api/site/team?domain=%s', $this->managerUrl, $domain);
-            $response = wp_remote_get($url, [
-                'headers' => [
+        if ( is_null( $api ) || empty( $api ) ) {
+            $url = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
+            $response = wp_remote_get( $url, array(
+                'headers' => array(
                     'Authorization' => 'Bearer ' . $this->managerToken,
                     'Accept' => 'application/json',
-                ],
+                ),
                 'timeout' => 10,
-            ]);
+            ) );
 
-            if (is_wp_error($response)) $api = null;
+            if ( is_wp_error( $response ) ) {
+                $api = null;
+            }
 
-            $body = json_decode(wp_remote_retrieve_body($response), true);
+            $body = json_decode( wp_remote_retrieve_body( $response ), true );
 
-            $data = isset($body['auth_type']) ? $body : null;
+            $data = isset( $body['auth_type'] ) ? $body : null;
 
-            // Save Cache 10 minutes
-            set_transient($this->cacheKey, $data, 1 * MINUTE_IN_SECONDS);
+            // Save Cache 1 minute
+            set_transient( $this->cacheKey, $data, 1 * MINUTE_IN_SECONDS );
             $api = $data;
         }
 
-        if (isset($api['auth_type']) && $api['auth_type'] == 'sso')
-        {
+        if ( isset( $api['auth_type'] ) && $api['auth_type'] == 'sso' ) {
             echo '<style>
-            #loginform label[for="user_login"],
-            #user_login,
-             #loginform label[for="user_pass"],
-             #user_pass,
-              #loginform .forgetmenot,
-               #loginform .submit {
-                display: none !important;
-            }
-        </style>';
+			#loginform label[for="user_login"],
+			#user_login,
+			 #loginform label[for="user_pass"],
+			 #user_pass,
+			  #loginform .forgetmenot,
+			   #loginform .submit {
+				display: none !important;
+			}
+		</style>';
         }
     }
 
-    private function setCookieUser($email)
-    {
-        setcookie('sso_email', $email, 0, '/');
+    /**
+     * Set SSO email cookie for user session
+     *
+     * @param string $email User email address
+     * @return void
+     */
+    private function set_cookie_user( $email ) {
+        setcookie( 'sso_email', $email, 0, '/' );
     }
 
 }
