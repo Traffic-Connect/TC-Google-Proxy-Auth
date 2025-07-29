@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: Traffic Connect
  */
 
@@ -19,10 +19,10 @@ class AuthGoogle
     private $managerToken = '';
     private $cacheKey = '';
 
-    private $urlLogin = 'admin-auth-login';
-
     public function __construct()
     {
+
+        //
 
     }
 
@@ -34,32 +34,32 @@ class AuthGoogle
         add_action('login_enqueue_scripts', [$this, 'login_enqueue_scripts']);
 
         add_action('login_head', [$this, 'hide_form_login']);
-
-        add_action('init', [$this, 'add_url_login']);
-        add_filter('query_vars', [$this, 'add_url_login_vars']);
-        add_action('parse_request', [$this, 'auth_redirect_url']);
+        add_action('init', [$this, 'auth_redirect_url']);
     }
 
-    public function add_url_login()
+    public function auth_redirect_url()
     {
-        add_rewrite_rule(sprintf('^%s/?$', $this->urlLogin), 'index.php?auth_google=1', 'top');
-        flush_rewrite_rules();
-    }
 
-    public function add_url_login_vars($vars)
-    {
-        $vars[] = 'auth_google';
-        return $vars;
-    }
-
-    public function auth_redirect_url($wp)
-    {
-        if (!empty($wp->query_vars['auth_google'])) {
+        if (!is_user_logged_in() && isset($_GET['auth_google']) && $_GET['auth_google'] == 1)
+        {
             $redirect = esc_url(site_url('/wp-login.php'));
             $oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
             wp_redirect($oauth_url);
             exit;
         }
+    }
+
+    private function get_current_url_with_param()
+    {
+
+        $scheme = ( !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ) ? "https" : "http";
+        $host   = $_SERVER['HTTP_HOST'];
+        $uri    = $_SERVER['REQUEST_URI'];
+        $url    = $scheme . "://" . $host . $uri;
+
+        $url = add_query_arg( 'auth_google', '1', $url );
+
+        return $url;
     }
 
     /**
@@ -169,7 +169,6 @@ class AuthGoogle
                 $user = get_user_by('email', $email);
 
                 if ($user) {
-                    $this->setCookieUser($email);
                     wp_set_auth_cookie($user->ID, true);
                     wp_redirect(admin_url());
                     exit;
@@ -198,7 +197,6 @@ class AuthGoogle
                     $user = get_user_by('login', 'administrator');
                     if($user)
                     {
-                        $this->setCookieUser($email);
                         wp_set_auth_cookie($user->ID, true);
                         wp_redirect(admin_url());
                         exit;
@@ -210,7 +208,6 @@ class AuthGoogle
                     $user = get_user_by('login', 'editor');
                     if($user)
                     {
-                        $this->setCookieUser($email);
                         wp_set_auth_cookie($user->ID, true);
                         wp_redirect(admin_url());
                         exit;
@@ -226,7 +223,6 @@ class AuthGoogle
 
                 if($user)
                 {
-                    $this->setCookieUser($email);
                     wp_set_auth_cookie($user->ID, true);
                     wp_redirect(admin_url());
                     exit;
@@ -258,13 +254,10 @@ class AuthGoogle
     public function login_form(): void
     {
 
-        //$redirect = esc_url(site_url('/wp-login.php'));
-        //$oauth_url = sprintf('%s?redirect=%s', $this->urlRedirect, $redirect);
-
-        $oauth_url = site_url(sprintf('%s/?auth_google=1', $this->urlLogin));
+        $url = $this->get_current_url_with_param();
 
         echo '<div class="google-login-button-wrapper">';
-        echo '<a href="' . esc_url($oauth_url) . '" class="google-login-button">';
+        echo '<a href="' . esc_url($url) . '" class="google-login-button">';
         echo '<img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />';
         echo '<span>Войти через Google</span>';
         echo '</a>';
@@ -333,11 +326,6 @@ class AuthGoogle
             }
         </style>';
         }
-    }
-
-    private function setCookieUser($email)
-    {
-        setcookie('sso_email', $email, 0, '/');
     }
 
 }
