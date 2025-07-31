@@ -277,7 +277,7 @@ class AuthGoogle {
 		//delete_transient($this->cacheKey);
 		$api = get_transient( $this->cacheKey );
 
-		if ( is_null( $api ) || empty( $api ) ) {
+		if ( $api === false ) {
 			$url      = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
 			$response = wp_remote_get( $url, [
 				'headers' => [
@@ -296,7 +296,13 @@ class AuthGoogle {
 			$data = isset( $body['auth_type'] ) ? $body : null;
 
 			// Save Cache 10 minutes
-			set_transient( $this->cacheKey, $data, 1 * MINUTE_IN_SECONDS );
+            if(is_null($api))
+            {
+                delete_transient($this->cacheKey);
+            }else{
+                set_transient( $this->cacheKey, $data, 1 * MINUTE_IN_SECONDS );
+            }
+
 			$api = $data;
 		}
 
