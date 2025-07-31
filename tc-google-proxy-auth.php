@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.2
+ * Version: 1.0.3
  * Author: Traffic Connect
  */
 
