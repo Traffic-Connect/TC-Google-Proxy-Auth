@@ -168,7 +168,7 @@ class AuthGoogle {
 					exit;
 				}
 
-				if ( is_null( $api ) || empty( $api ) || ! isset( $api['team'] ) ) {
+				if ( $api === false || ! isset( $api['team'] ) ) {
 					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The site is not in the manager software.' ) ) );
 					exit;
 				}
