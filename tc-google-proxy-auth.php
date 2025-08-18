@@ -182,8 +182,7 @@ class AuthGoogle {
 			$teams = $this->decryptToken( $_GET['teams'] );
 			$teams = explode( ',', $teams );
 
-
-			$api = $this->my_cache_get( $this->cacheKey );
+			$api = $this->check_cache( $this->cacheKey );
 
 			if ( $email && str_ends_with( $email, sprintf( '@%s', $this->accessDomain ) ) ) {
 
@@ -314,46 +313,8 @@ class AuthGoogle {
 
 	public function hide_form_login() {
 
-		$site_url = site_url();
-		$domain   = parse_url( $site_url, PHP_URL_HOST );
-
 		//$this->my_cache_delete($this->cacheKey);
-		$api = $this->my_cache_get( $this->cacheKey );
-
-		if ( $api === false || is_null( $api ) ) {
-			$url      = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
-			$response = wp_remote_get( $url, [
-				'headers' => [
-					'Authorization' => 'Bearer ' . $this->managerToken,
-					'Accept'        => 'application/json',
-				],
-				'timeout' => 10,
-			] );
-
-			if ( is_wp_error( $response ) ) {
-				$this->my_cache_delete( $this->cacheKey );
-				$api = null;
-			} else {
-				$response_code = wp_remote_retrieve_response_code( $response );
-				$body          = wp_remote_retrieve_body( $response );
-
-				if ( $response_code === 200 && ! empty( $body ) ) {
-					$data = json_decode( $body, true );
-
-					if ( json_last_error() === JSON_ERROR_NONE && isset( $data['auth_type'] ) ) {
-						$this->my_cache_set( $this->cacheKey, $data, 60 );
-						$api = $data;
-					} else {
-						$this->my_cache_delete( $this->cacheKey );
-						$api = null;
-					}
-				} else {
-					$this->my_cache_delete( $this->cacheKey );
-					$api = null;
-				}
-			}
-
-		}
+		$api = $this->check_cache( $this->cacheKey );
 
 		if ( is_null( $api ) ) {
 			add_action( 'error_cache_manager_soft', function () {
@@ -393,6 +354,47 @@ class AuthGoogle {
 		}
 	}
 
+	private function check_cache( $cacheKey ) {
+		$api = $this->my_cache_get( $cacheKey );
+		if ( $api === false || is_null( $api ) ) {
+			$site_url = site_url();
+			$domain   = parse_url( $site_url, PHP_URL_HOST );
+			$url      = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
+			$response = wp_remote_get( $url, [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->managerToken,
+					'Accept'        => 'application/json',
+				],
+				'timeout' => 10,
+			] );
+
+			if ( is_wp_error( $response ) ) {
+				$this->my_cache_delete( $this->cacheKey );
+				$api = null;
+			} else {
+				$response_code = wp_remote_retrieve_response_code( $response );
+				$body          = wp_remote_retrieve_body( $response );
+
+				if ( $response_code === 200 && ! empty( $body ) ) {
+					$data = json_decode( $body, true );
+
+					if ( json_last_error() === JSON_ERROR_NONE && isset( $data['auth_type'] ) ) {
+						$this->my_cache_set( $this->cacheKey, $data, 60 );
+						$api = $data;
+					} else {
+						$this->my_cache_delete( $this->cacheKey );
+						$api = null;
+					}
+				} else {
+					$this->my_cache_delete( $this->cacheKey );
+					$api = null;
+				}
+			}
+		}
+
+		return $api;
+	}
+
 	private function my_cache_set( $key, $value, $expiration = 60 ) {
 		$data = [
 			'value'      => $value,
@@ -419,7 +421,6 @@ class AuthGoogle {
 	private function my_cache_delete( $key ) {
 		delete_option( 'tc_google_auth_cache_' . $key );
 	}
-
 }
 
 $auth = new AuthGoogle();
