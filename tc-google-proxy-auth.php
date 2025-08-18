@@ -11,12 +11,12 @@ defined( 'ABSPATH' ) || exit;
 
 class AuthGoogle {
 
-	private $token = '5f9b73c8e7262a1b90f4a3dc2e835fae';
-	private $urlRedirect = 'https://wpauth.astroflow.cyou/oauth/redirect';
-	private $accessDomain = 'trafficconnect.com';
-	private $managerUrl = 'https://manager.tcnct.com';
-	private $managerToken = '1f5815640880bbd9f2796d45a2822226dbe51b27169b9d6723e1c101671943e2';
-	private $cacheKey = 'hide_login_form';
+	private $token = '';
+	private $urlRedirect = '';
+	private $accessDomain = '';
+	private $managerUrl = '';
+	private $managerToken = '';
+	private $cacheKey = '';
 
 	public function __construct() {
 
