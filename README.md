@@ -1,5 +1,8 @@
 ## must-use плагин TC Google Proxy Auth
 
+Setup script
+https://github.com/Traffic-Connect/script-google-auth
+
 ## Описание ошибок
 
 ```
