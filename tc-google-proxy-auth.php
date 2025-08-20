@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.3
+ * Version: 1.0.5
  * Author: Traffic Connect
  */
 
@@ -29,22 +29,34 @@ class AuthGoogle {
 		add_action( 'login_form', [ $this, 'login_form' ] );
 		add_action( 'login_message', [ $this, 'login_message' ] );
 		add_action( 'login_enqueue_scripts', [ $this, 'login_enqueue_scripts' ] );
-
 		add_action( 'login_head', [ $this, 'hide_form_login' ] );
 		add_action( 'init', [ $this, 'auth_redirect_url' ] );
 	}
 
 	public function auth_redirect_url() {
 
+		// Редирект на прокси для авторизации
 		if ( ! is_user_logged_in() && isset( $_GET['auth_google'] ) && $_GET['auth_google'] == 1 ) {
 			$redirect  = esc_url( site_url( '/wp-login.php' ) );
 			$oauth_url = sprintf( '%s?redirect=%s', $this->urlRedirect, $redirect );
 			wp_redirect( $oauth_url );
 			exit;
 		}
+
+		// Очистка кэша
+		if ( ! is_user_logged_in() && isset( $_GET['google_clear_cache'] ) ) {
+
+			$this->my_cache_delete( $this->cacheKey );
+			$url = remove_query_arg( 'google_clear_cache' );
+			wp_redirect( $url );
+			exit;
+		}
+
+		// Очистка куков авторизации
+		$this->clear_wp_auth_cookie_before_sso();
 	}
 
-	private function get_current_url_with_param() {
+	private function get_current_url_with_param( $query = null ) {
 
 		$scheme = ( ! empty( $_SERVER['HTTPS'] ) && $_SERVER['HTTPS'] !== 'off' ) ? "https" : "http";
 		$host   = $_SERVER['HTTP_HOST'];
@@ -52,6 +64,10 @@ class AuthGoogle {
 		$url    = $scheme . "://" . $host . $uri;
 
 		$url = add_query_arg( 'auth_google', '1', $url );
+
+		if ( ! is_null( $query ) ) {
+			$url = add_query_arg( $query, '1', $url );
+		}
 
 		return $url;
 	}
@@ -115,6 +131,19 @@ class AuthGoogle {
 				white-space: nowrap;
 				box-sizing: border-box;
 			}
+			.google-login-error-wrapper {
+				margin-top: 12px;
+				margin-bottom: 12px;
+				color: red;
+			}
+			.google-login-error-wrapper-btn a.button-secondary {
+				display: flex;
+				margin-bottom: 15px;
+				margin-top: 12px;
+				text-align: center;
+				justify-content: center;
+				align-items: center;
+			}
 		</style>
 		<?php
 	}
@@ -140,36 +169,47 @@ class AuthGoogle {
 	 * @return void
 	 */
 	public function oauth_init(): void {
-		if ( is_user_logged_in() ) {
-			return;
-		}
 
 		if ( isset( $_GET['oauth_token'] ) ) {
 
-			//Get Email
+			// Get Email
 			$email = $this->decryptToken( $_GET['oauth_token'] );
 
-			//Get Role
+			// Get Role
 			$role = $this->decryptToken( $_GET['role'] );
 
-			//Get Teams
+			// Get Teams
 			$teams = $this->decryptToken( $_GET['teams'] );
 			$teams = explode( ',', $teams );
 
-
-			$api = get_transient( $this->cacheKey );
+			$api = $this->check_cache( $this->cacheKey );
 
 			if ( $email && str_ends_with( $email, sprintf( '@%s', $this->accessDomain ) ) ) {
+
 				$user = get_user_by( 'email', $email );
 
+				// 1. Если такой пользователь есть в админке то авторизируем его
 				if ( $user ) {
 					wp_set_auth_cookie( $user->ID, true );
 					wp_redirect( admin_url() );
 					exit;
 				}
 
-				if ( $api === false || ! isset( $api['team'] ) ) {
+				// 2. Если в кэше нет данных с софт менеджера
+				if ( $api === false ) {
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The cache did not receive data from the manager.' ) ) );
+					exit;
+				}
+
+				// 3. Если в кэше нет данных об этом сайте
+				if ( ! isset( $api['team'] ) ) {
 					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The site is not in the manager software.' ) ) );
+					exit;
+				}
+
+				// 4. Если в кэше нет данных об команде
+				if ( is_null( $api['team'] ) || empty( $api['team'] ) ) {
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'There is no command assigned to this site in the manager.' ) ) );
 					exit;
 				}
 
@@ -226,7 +266,6 @@ class AuthGoogle {
 			}
 		}
 
-
 		if ( isset( $_GET['error'] ) ) {
 			add_filter( 'login_errors', function () {
 				return sanitize_text_field( $_GET['error'] );
@@ -244,10 +283,11 @@ class AuthGoogle {
 		echo '<div class="google-login-button-wrapper">';
 		echo '<a href="' . esc_url( $url ) . '" class="google-login-button">';
 		echo '<img src="https://developers.google.com/identity/images/g-logo.png" alt="Google" class="google-icon" />';
-		echo '<span>Войти через Google</span>';
+		echo '<span>Login with Google</span>';
 		echo '</a>';
 		echo '</div>';
 
+		do_action( 'error_cache_manager_soft' );
 	}
 
 	/**
@@ -271,39 +311,23 @@ class AuthGoogle {
 
 	public function hide_form_login() {
 
-		$site_url = site_url();
-		$domain   = parse_url( $site_url, PHP_URL_HOST );
+		//$this->my_cache_delete($this->cacheKey);
+		$api = $this->check_cache( $this->cacheKey );
 
-		//delete_transient($this->cacheKey);
-		$api = get_transient( $this->cacheKey );
+		if ( is_null( $api ) ) {
+			add_action( 'error_cache_manager_soft', function () {
+				echo '<div class="google-login-error-wrapper">';
+				echo '<span>No data was received from the software manager. Try resetting the cache and retrying authorization.</span>';
+				echo '</div>';
 
-		if ( $api === false ) {
-			$url      = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
-			$response = wp_remote_get( $url, [
-				'headers' => [
-					'Authorization' => 'Bearer ' . $this->managerToken,
-					'Accept'        => 'application/json',
-				],
-				'timeout' => 10,
-			] );
+				$url = $this->get_current_url_with_param( 'google_clear_cache' );
+				$url = remove_query_arg( 'auth_google', $url );
 
-			if ( is_wp_error( $response ) ) {
-				$api = null;
-			}
+				echo '<div class="google-login-error-wrapper-btn">';
+				echo '<a href="' . $url . '" class="button-secondary">Reset cache</a>';
+				echo '</div>';
 
-			$body = json_decode( wp_remote_retrieve_body( $response ), true );
-
-			$data = isset( $body['auth_type'] ) ? $body : null;
-
-			// Save Cache 10 minutes
-            if(is_null($api))
-            {
-                delete_transient($this->cacheKey);
-            }else{
-                set_transient( $this->cacheKey, $data, 1 * MINUTE_IN_SECONDS );
-            }
-
-			$api = $data;
+			} );
 		}
 
 		if ( isset( $api['auth_type'] ) && $api['auth_type'] == 'sso' ) {
@@ -328,6 +352,110 @@ class AuthGoogle {
 		}
 	}
 
+	/**
+	 * Check cache
+	 *
+	 * @param $cacheKey
+	 *
+	 * @return false|mixed|null
+	 */
+	private function check_cache( $cacheKey ) {
+		$api = $this->my_cache_get( $cacheKey );
+		if ( $api === false || is_null( $api ) ) {
+			$site_url = site_url();
+			$domain   = parse_url( $site_url, PHP_URL_HOST );
+			$url      = sprintf( '%s/api/site/team?domain=%s', $this->managerUrl, $domain );
+			$response = wp_remote_get( $url, [
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->managerToken,
+					'Accept'        => 'application/json',
+				],
+				'timeout' => 10,
+			] );
+
+			if ( is_wp_error( $response ) ) {
+				$this->my_cache_delete( $this->cacheKey );
+				$api = null;
+			} else {
+				$response_code = wp_remote_retrieve_response_code( $response );
+				$body          = wp_remote_retrieve_body( $response );
+
+				if ( $response_code === 200 && ! empty( $body ) ) {
+					$data = json_decode( $body, true );
+
+					if ( json_last_error() === JSON_ERROR_NONE && isset( $data['auth_type'] ) ) {
+						$this->my_cache_set( $this->cacheKey, $data, 60 );
+						$api = $data;
+					} else {
+						$this->my_cache_delete( $this->cacheKey );
+						$api = null;
+					}
+				} else {
+					$this->my_cache_delete( $this->cacheKey );
+					$api = null;
+				}
+			}
+		}
+
+		return $api;
+	}
+
+	/*
+	 * Set cache
+	 */
+	private function my_cache_set( $key, $value, $expiration = 60 ) {
+		$data = [
+			'value'      => $value,
+			'expiration' => time() + $expiration,
+		];
+		update_option( 'tc_google_auth_cache_' . $key, $data, false );
+	}
+
+	/*
+	 * Get cache
+	 */
+	private function my_cache_get( $key ) {
+		$data = get_option( 'tc_google_auth_cache_' . $key );
+		if ( ! $data || ! isset( $data['expiration'] ) ) {
+			return false;
+		}
+
+		if ( time() > $data['expiration'] ) {
+			delete_option( 'tc_google_auth_cache_' . $key );
+
+			return false;
+		}
+
+		return $data['value'];
+	}
+
+	/*
+	 * Delete cache
+	 */
+	private function my_cache_delete( $key ) {
+		delete_option( 'tc_google_auth_cache_' . $key );
+	}
+
+	/**
+	 * Clears the WordPress authentication cookies before SSO
+	 * @return void
+	 */
+	public function clear_wp_auth_cookie_before_sso() {
+		$refresh = false;
+		foreach ( $_COOKIE as $name => $value ) {
+			if ( strpos( $name, 'wordpress_logged_in_' ) === 0 ) {
+				setcookie( $name, '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+				setcookie( $name, '', time() - 3600, SITECOOKIEPATH, COOKIE_DOMAIN );
+				unset( $_COOKIE[ $name ] );
+				$refresh = true;
+			}
+		}
+
+		if ( $refresh ) {
+			header( 'Location: ' . $_SERVER['REQUEST_URI'] );
+			exit;
+		}
+	}
 }
 
 $auth = new AuthGoogle();
