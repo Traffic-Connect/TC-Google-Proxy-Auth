@@ -31,6 +31,7 @@ class AuthGoogle {
 		add_action( 'login_enqueue_scripts', [ $this, 'login_enqueue_scripts' ] );
 		add_action( 'login_head', [ $this, 'hide_form_login' ] );
 		add_action( 'init', [ $this, 'auth_redirect_url' ] );
+		add_action( 'login_init', [ $this, 'login_init' ] );
 	}
 
 	public function auth_redirect_url() {
@@ -51,7 +52,9 @@ class AuthGoogle {
 			wp_redirect( $url );
 			exit;
 		}
+	}
 
+	public function login_init() {
 		// Очистка куков авторизации
 		$this->clear_wp_auth_cookie_before_sso();
 	}
