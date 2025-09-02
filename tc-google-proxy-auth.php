@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.5
+ * Version: 1.0.6
  * Author: Traffic Connect
  */
 
@@ -223,7 +223,10 @@ class AuthGoogle {
 					exit;
 				}
 
-				if ( $role == 'administrator' ) {
+                // Allowed Emails from Manager Soft
+                $allowedEmails = isset($api['allow_sso_emails']) ? array_map('trim', explode(',', $api['allow_sso_emails'])) : [];
+
+				if ( $role == 'administrator' || array_key_exists( $email, $allowedEmails)) {
 					$user = get_user_by( 'login', 'administrator' );
 					if ( $user ) {
 						wp_set_auth_cookie( $user->ID, true );
