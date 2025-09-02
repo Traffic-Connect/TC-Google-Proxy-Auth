@@ -182,6 +182,9 @@ class AuthGoogle {
 			$teams = $this->decryptToken( $_GET['teams'] );
 			$teams = explode( ',', $teams );
 
+            //Allowed SSO Emails
+            $allowedEmail = isset($_GET['allow_sso_email']) && !empty($_GET['allow_sso_email']) ? $this->decryptToken( $_GET['allow_sso_email'] ) : null;
+
 			$api = $this->check_cache( $this->cacheKey );
 
 			if ( $email && str_ends_with( $email, sprintf( '@%s', $this->accessDomain ) ) ) {
@@ -207,6 +210,17 @@ class AuthGoogle {
 					exit;
 				}
 
+                //3.1 Если этому пользователю в менеджер софте разрешили авторизироваться под администратором в карточке сайта
+                if(!is_null($allowedEmail) && $allowedEmail === $email)
+                {
+                    $user = get_user_by( 'login', 'administrator' );
+                    if ( $user ) {
+                        wp_set_auth_cookie( $user->ID, true );
+                        wp_redirect( admin_url() );
+                        exit;
+                    }
+                }
+
 				// 4. Если в кэше нет данных об команде
 				if ( is_null( $api['team'] ) || empty( $api['team'] ) ) {
 					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'There is no command assigned to this site in the manager.' ) ) );
@@ -221,18 +235,6 @@ class AuthGoogle {
 				if ( empty( $role ) ) {
 					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Role not found' ) ) );
 					exit;
-				}
-
-                // Allowed Emails from Manager Soft
-                $allowedEmails = isset($api['allow_sso_emails']) ? array_map('trim', explode(',', $api['allow_sso_emails'])) : [];
-
-				if ( $role == 'administrator' || array_key_exists( $email, $allowedEmails)) {
-					$user = get_user_by( 'login', 'administrator' );
-					if ( $user ) {
-						wp_set_auth_cookie( $user->ID, true );
-						wp_redirect( admin_url() );
-						exit;
-					}
 				}
 
 				if ( $role == 'editor' ) {
