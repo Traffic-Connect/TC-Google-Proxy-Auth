@@ -230,7 +230,7 @@ class AuthGoogle {
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ', $teams ) ) ) );
 					exit;
 				}
 
