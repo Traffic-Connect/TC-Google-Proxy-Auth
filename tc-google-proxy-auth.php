@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.7
+ * Version: 1.0.8
  * Author: Traffic Connect
  */
 
@@ -230,7 +230,7 @@ class AuthGoogle {
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ', $teams ) ) ) );
 					exit;
 				}
 
