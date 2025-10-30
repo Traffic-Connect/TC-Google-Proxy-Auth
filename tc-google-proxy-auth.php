@@ -56,7 +56,9 @@ class AuthGoogle {
 
 	public function login_init() {
 		// Очистка куков авторизации
-		$this->clear_wp_auth_cookie_before_sso();
+		if (isset($_GET['oauth_token'])) {
+			$this->clear_wp_auth_cookie_before_sso();
+		}
 	}
 
 	private function get_current_url_with_param( $query = null ) {
@@ -344,6 +346,14 @@ class AuthGoogle {
 				echo '</div>';
 
 			} );
+			
+			// Отключаем SSO если нет данных из менеджера
+			remove_action('init', [$this, 'oauth_init']);
+			remove_action('login_form', [$this, 'login_form']);
+			remove_action('login_message', [$this, 'login_message']);
+			remove_action('login_enqueue_scripts', [$this, 'login_enqueue_scripts']);
+			remove_action('init', [$this, 'auth_redirect_url']);
+			return;
 		}
 
 		if ( isset( $api['auth_type'] ) && $api['auth_type'] == 'sso' ) {
