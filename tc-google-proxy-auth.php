@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.8
+ * Version: 1.0.9
  * Author: Traffic Connect
  */
 
@@ -56,7 +56,9 @@ class AuthGoogle {
 
 	public function login_init() {
 		// Очистка куков авторизации
-		$this->clear_wp_auth_cookie_before_sso();
+		if ( isset( $_GET['oauth_token'] ) ) {
+			$this->clear_wp_auth_cookie_before_sso();
+		}
 	}
 
 	private function get_current_url_with_param( $query = null ) {
@@ -230,7 +232,8 @@ class AuthGoogle {
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ', $teams ) ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ',
+								$teams ) ) ) );
 					exit;
 				}
 
@@ -359,7 +362,7 @@ class AuthGoogle {
         </style>';
 		}
 
-		if ( isset( $api['auth_type'] ) && $api['auth_type'] == 'form' ) {
+		if ( ! isset( $api['auth_type'] ) || ( isset( $api['auth_type'] ) && $api['auth_type'] == 'form' ) ) {
 			remove_action( 'init', [ $this, 'oauth_init' ] );
 			remove_action( 'login_form', [ $this, 'login_form' ] );
 			remove_action( 'login_message', [ $this, 'login_message' ] );
