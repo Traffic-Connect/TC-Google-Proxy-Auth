@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.0.9
+ * Version: 1.1.0
  * Author: Traffic Connect
  */
 
@@ -148,6 +148,11 @@ class AuthGoogle {
 				text-align: center;
 				justify-content: center;
 				align-items: center;
+			}
+			.google-login-version {
+				text-align: center;
+				font-size: 12px;
+				color: gray;
 			}
 		</style>
 		<?php
@@ -297,7 +302,9 @@ class AuthGoogle {
 	 */
 	public function login_form(): void {
 
-		$url = $this->get_current_url_with_param();
+		$url            = $this->get_current_url_with_param();
+		$plugin_data    = get_plugin_data( __FILE__ );
+		$plugin_version = $plugin_data['Version'];
 
 		echo '<div class="google-login-button-wrapper">';
 		echo '<a href="' . esc_url( $url ) . '" class="google-login-button">';
@@ -305,6 +312,8 @@ class AuthGoogle {
 		echo '<span>Login with Google</span>';
 		echo '</a>';
 		echo '</div>';
+
+		echo '<div class="google-login-version">ver ' . $plugin_version . '</div>';
 
 		do_action( 'error_cache_manager_soft' );
 	}
