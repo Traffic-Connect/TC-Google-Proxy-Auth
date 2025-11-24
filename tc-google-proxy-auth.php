@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Traffic Connect
  */
 
@@ -223,6 +223,9 @@ class AuthGoogle {
 				// 3.1 Если этому пользователю в менеджер софте разрешили авторизироваться под администратором в карточке сайта
 				if ( ! is_null( $allowedEmail ) && $allowedEmail === $email ) {
 					$user = get_user_by( 'login', 'administrator' );
+					if ( ! $user ) {
+						$user = $this->get_first_user();
+					}
 					if ( $user ) {
 						wp_set_auth_cookie( $user->ID, true );
 						wp_redirect( admin_url() );
@@ -265,13 +268,7 @@ class AuthGoogle {
 					}
 				}
 
-				$users = get_users( [
-					'number'  => 1,
-					'orderby' => 'user_registered',
-					'order'   => 'ASC',
-				] );
-				$user  = $users[0] ?? null;
-
+				$user = $this->get_first_user();
 				if ( $user ) {
 					wp_set_auth_cookie( $user->ID, true );
 					wp_redirect( admin_url() );
@@ -295,6 +292,19 @@ class AuthGoogle {
 				return sanitize_text_field( $_GET['error'] );
 			} );
 		}
+	}
+
+	/**
+	 * @return mixed|null
+	 */
+	private function get_first_user() {
+		$users = get_users( [
+			'number'  => 1,
+			'orderby' => 'user_registered',
+			'order'   => 'ASC',
+		] );
+
+		return $users[0] ?? null;
 	}
 
 	/**
