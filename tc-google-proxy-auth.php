@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Traffic Connect
  */
 
@@ -203,6 +203,10 @@ class AuthGoogle {
 
 				// 1. Если такой пользователь есть в админке то авторизируем его
 				if ( $user ) {
+					// Сохраняем SSO email для логирования
+					if ( ! is_null( $allowedEmail ) ) {
+						update_user_meta( $user->ID, 'tc_sso_email', $email );
+					}
 					wp_set_auth_cookie( $user->ID, true );
 					wp_redirect( admin_url() );
 					exit;
@@ -227,6 +231,8 @@ class AuthGoogle {
 						$user = $this->get_first_user();
 					}
 					if ( $user ) {
+						// Сохраняем SSO email для логирования
+						update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
 						wp_redirect( admin_url() );
 						exit;
@@ -253,6 +259,8 @@ class AuthGoogle {
 				if ( $role == 'administrator' ) {
 					$user = get_user_by( 'login', 'administrator' );
 					if ( $user ) {
+                        // Сохраняем SSO email для логирования
+                        update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
 						wp_redirect( admin_url() );
 						exit;
@@ -262,6 +270,8 @@ class AuthGoogle {
 				if ( $role == 'editor' ) {
 					$user = get_user_by( 'login', 'editor' );
 					if ( $user ) {
+                        // Сохраняем SSO email для логирования
+                        update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
 						wp_redirect( admin_url() );
 						exit;
@@ -270,6 +280,8 @@ class AuthGoogle {
 
 				$user = $this->get_first_user();
 				if ( $user ) {
+                    // Сохраняем SSO email для логирования
+                    update_user_meta( $user->ID, 'tc_sso_email', $email );
 					wp_set_auth_cookie( $user->ID, true );
 					wp_redirect( admin_url() );
 					exit;
