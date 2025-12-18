@@ -11,12 +11,19 @@ defined( 'ABSPATH' ) || exit;
 
 class AuthGoogle {
 
-	private $token = '';
-	private $urlRedirect = '';
-	private $accessDomain = '';
-	private $managerUrl = '';
-	private $managerToken = '';
-	private $cacheKey = '';
+//	private $token = '';
+//	private $urlRedirect = '';
+//	private $accessDomain = '';
+//	private $managerUrl = '';
+//	private $managerToken = '';
+//	private $cacheKey = '';
+
+    private $token = '5f9b73c8e7262a1b90f4a3dc2e835fae';
+    private $urlRedirect = 'https://wpauth.astroflow.cyou/oauth/redirect';
+    private $accessDomain = 'trafficconnect.com';
+    private $managerUrl = 'https://manager.tcnct.com';
+    private $managerToken = '1f5815640880bbd9f2796d45a2822226dbe51b27169b9d6723e1c101671943e2';
+    private $cacheKey = 'hide_login_form';
 
 	public function __construct() {
 
@@ -208,6 +215,10 @@ class AuthGoogle {
 						update_user_meta( $user->ID, 'tc_sso_email', $email );
 					}
 					wp_set_auth_cookie( $user->ID, true );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 					wp_redirect( admin_url() );
 					exit;
 				}
@@ -234,6 +245,8 @@ class AuthGoogle {
 						// Сохраняем SSO email для логирования
 						update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 						wp_redirect( admin_url() );
 						exit;
 					}
@@ -262,6 +275,8 @@ class AuthGoogle {
                         // Сохраняем SSO email для логирования
                         update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 						wp_redirect( admin_url() );
 						exit;
 					}
@@ -273,6 +288,8 @@ class AuthGoogle {
                         // Сохраняем SSO email для логирования
                         update_user_meta( $user->ID, 'tc_sso_email', $email );
 						wp_set_auth_cookie( $user->ID, true );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 						wp_redirect( admin_url() );
 						exit;
 					}
@@ -283,6 +300,8 @@ class AuthGoogle {
                     // Сохраняем SSO email для логирования
                     update_user_meta( $user->ID, 'tc_sso_email', $email );
 					wp_set_auth_cookie( $user->ID, true );
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 					wp_redirect( admin_url() );
 					exit;
 
