@@ -18,6 +18,17 @@ class AuthGoogle {
 	private $managerToken = '';
 	private $cacheKey = '';
 
+    private $messages = [
+        0 => 'The cache did not receive data from the manager.',
+        1 => 'The site is not in the manager software.',
+        2 => 'There is no command assigned to this site in the manager.',
+        3 => 'The command doesn\'t match. Current access to teams ',
+        4 => 'Role not found',
+        5 => 'Unknown error. Please contact your administrator.',
+        6 => 'Invalid email.',
+        7 => 'No data was received from the software manager. Try resetting the cache and retrying authorization.'
+    ];
+
 	public function __construct() {
 
 		//
@@ -210,13 +221,13 @@ class AuthGoogle {
 
 				// 2. Если в кэше нет данных с софт менеджера
 				if ( $api === false ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The cache did not receive data from the manager.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[0] ) ) );
 					exit;
 				}
 
 				// 3. Если в кэше нет данных об этом сайте
 				if ( ! isset( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The site is not in the manager software.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[1] ) ) );
 					exit;
 				}
 
@@ -235,32 +246,23 @@ class AuthGoogle {
 
 				// 4. Если в кэше нет данных об команде
 				if ( is_null( $api['team'] ) || empty( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'There is no command assigned to this site in the manager.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[2]) ) );
 					exit;
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ',
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[3] . implode( ', ',
 								$teams ) ) ) );
 					exit;
 				}
 
 				if ( empty( $role ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Role not found' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[4] ) ) );
 					exit;
 				}
 
 				if ( $role == 'administrator' ) {
 					$user = get_user_by( 'login', 'administrator' );
-					if ( $user ) {
-						wp_set_auth_cookie( $user->ID, true );
-						wp_redirect( admin_url() );
-						exit;
-					}
-				}
-
-				if ( $role == 'editor' ) {
-					$user = get_user_by( 'login', 'editor' );
 					if ( $user ) {
 						wp_set_auth_cookie( $user->ID, true );
 						wp_redirect( admin_url() );
@@ -276,12 +278,12 @@ class AuthGoogle {
 
 				}
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Unknown error. Please contact your administrator.' ) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[5]) ) );
 				exit;
 
 			} else {
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Invalid email.' ) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[6]) ) );
 				exit;
 
 			}
@@ -355,7 +357,7 @@ class AuthGoogle {
 		if ( is_null( $api ) ) {
 			add_action( 'error_cache_manager_soft', function () {
 				echo '<div class="google-login-error-wrapper">';
-				echo '<span>No data was received from the software manager. Try resetting the cache and retrying authorization.</span>';
+				echo '<span>'.$this->messages[7].'</span>';
 				echo '</div>';
 
 				$url = $this->get_current_url_with_param( 'google_clear_cache' );
