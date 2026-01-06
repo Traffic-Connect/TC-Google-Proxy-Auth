@@ -261,15 +261,6 @@ class AuthGoogle {
 					exit;
 				}
 
-				if ( $role == 'administrator' ) {
-					$user = get_user_by( 'login', 'administrator' );
-					if ( $user ) {
-						wp_set_auth_cookie( $user->ID, true );
-						wp_redirect( admin_url() );
-						exit;
-					}
-				}
-
 				$user = $this->get_first_user();
 				if ( $user ) {
 					wp_set_auth_cookie( $user->ID, true );
