@@ -19,14 +19,13 @@ class AuthGoogle {
 	private $cacheKey = '';
 
     private $messages = [
-            0 => 'Система кэширования не получила данные от менеджера.',
-            1 => 'Сайт не зарегистрирован в системе управления.',
-            2 => 'Команда для данного сайта не определена.',
-            3 => 'Обнаружено несоответствие команды. Текущий уровень доступа: ',
-            4 => 'Указанная роль отсутствует.',
-            5 => 'Произошла непредвиденная ошибка. Обратитесь в службу поддержки.',
-            6 => 'Указан недействительный адрес электронной почты.',
-            7 => 'Ответ от системы управления не получен. Выполните очистку кэша и повторите процесс авторизации.'
+            'cache_error' => 'Система кэширования не получила данные от менеджера.',
+            'not_register_site' => 'Сайт не зарегистрирован в системе управления.',
+            'team_not_check' => 'Команда для данного сайта не определена.',
+            'team_not_level' => 'Обнаружено несоответствие команды. Текущий уровень доступа: ',
+            'error' => 'Произошла непредвиденная ошибка. Обратитесь в службу поддержки.',
+            'email_error' => 'Указан недействительный адрес электронной почты.',
+            'error_not_response' => 'Ответ от системы управления не получен. Выполните очистку кэша и повторите процесс авторизации.'
     ];
 
 	public function __construct() {
@@ -196,9 +195,6 @@ class AuthGoogle {
 			// Get Email
 			$email = $this->decryptToken( $_GET['oauth_token'] );
 
-			// Get Role
-			$role = $this->decryptToken( $_GET['role'] );
-
 			// Get Teams
 			$teams = $this->decryptToken( $_GET['teams'] );
 			$teams = explode( ',', $teams );
@@ -221,13 +217,13 @@ class AuthGoogle {
 
 				// 2. Если в кэше нет данных с софт менеджера
 				if ( $api === false ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[0] ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['cache_error'] ) ) );
 					exit;
 				}
 
 				// 3. Если в кэше нет данных об этом сайте
 				if ( ! isset( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[1] ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['not_register_site'] ) ) );
 					exit;
 				}
 
@@ -246,18 +242,13 @@ class AuthGoogle {
 
 				// 4. Если в кэше нет данных об команде
 				if ( is_null( $api['team'] ) || empty( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[2]) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['team_not_check']) ) );
 					exit;
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[3] . implode( ', ',
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['team_not_level'] . implode( ', ',
 								$teams ) ) ) );
-					exit;
-				}
-
-				if ( empty( $role ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages[4] ) ) );
 					exit;
 				}
 
@@ -269,12 +260,12 @@ class AuthGoogle {
 
 				}
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[5]) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['error']) ) );
 				exit;
 
 			} else {
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages[6]) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['email_error']) ) );
 				exit;
 
 			}
@@ -348,7 +339,7 @@ class AuthGoogle {
 		if ( is_null( $api ) ) {
 			add_action( 'error_cache_manager_soft', function () {
 				echo '<div class="google-login-error-wrapper">';
-				echo '<span>'.$this->messages[7].'</span>';
+				echo '<span>'.$this->messages['error_not_response'].'</span>';
 				echo '</div>';
 
 				$url = $this->get_current_url_with_param( 'google_clear_cache' );
