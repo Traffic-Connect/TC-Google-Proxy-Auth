@@ -19,15 +19,16 @@ class AuthGoogle {
 	private $cacheKey = '';
 
     private $messages = [
-        0 => 'The cache did not receive data from the manager.',
-        1 => 'The site is not in the manager software.',
-        2 => 'There is no command assigned to this site in the manager.',
-        3 => 'The command doesn\'t match. Current access to teams ',
-        4 => 'Role not found',
-        5 => 'Unknown error. Please contact your administrator.',
-        6 => 'Invalid email.',
-        7 => 'No data was received from the software manager. Try resetting the cache and retrying authorization.'
+            0 => 'Кэш не получил данные от менеджера.',
+            1 => 'Сайт отсутствует в программном менеджере.',
+            2 => 'Для этого сайта в менеджере не назначена команда.',
+            3 => 'Команда не совпадает. Текущий доступ к командам ',
+            4 => 'Роль не найдена.',
+            5 => 'Неизвестная ошибка. Пожалуйста, свяжитесь с администратором.',
+            6 => 'Некорректный адрес электронной почты.',
+            7 => 'Данные от программного менеджера не были получены. Попробуйте сбросить кэш и повторить авторизацию.'
     ];
+
 
 	public function __construct() {
 
