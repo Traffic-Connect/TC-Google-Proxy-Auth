@@ -3,7 +3,9 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.1.2
+
+ * Version: 1.1.3
+
  * Author: Traffic Connect
  */
 
@@ -42,6 +44,9 @@ class AuthGoogle {
 		add_action( 'login_head', [ $this, 'hide_form_login' ] );
 		add_action( 'init', [ $this, 'auth_redirect_url' ] );
 		add_action( 'login_init', [ $this, 'login_init' ] );
+
+        add_action('wp_logout', [ $this, 'logout' ] );
+        add_action('set_logged_in_cookie', [ $this, 'on_set_logged_in_cookie' ], 10, 6);
 	}
 
 	public function auth_redirect_url() {
@@ -210,7 +215,14 @@ class AuthGoogle {
 
 				// 1. Если такой пользователь есть в админке то авторизируем его
 				if ( $user ) {
+                    wp_set_current_user($user->ID);
 					wp_set_auth_cookie( $user->ID, true );
+
+                    // Сохраняем SSO email для логирования
+                    $this->sso_save_email_user($user, $email );
+
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 					wp_redirect( admin_url() );
 					exit;
 				}
@@ -234,7 +246,12 @@ class AuthGoogle {
 						$user = $this->get_first_user();
 					}
 					if ( $user ) {
+                        wp_set_current_user($user->ID);
 						wp_set_auth_cookie( $user->ID, true );
+                        // Сохраняем SSO email для логирования
+                        $this->sso_save_email_user($user, $email );
+                        // Вызываем хук wp_login для логирования
+                        do_action( 'wp_login', $user->user_login, $user );
 						wp_redirect( admin_url() );
 						exit;
 					}
@@ -254,7 +271,14 @@ class AuthGoogle {
 
 				$user = $this->get_first_user();
 				if ( $user ) {
+                    wp_set_current_user($user->ID);
 					wp_set_auth_cookie( $user->ID, true );
+
+                    // Сохраняем SSO email для логирования
+                    $this->sso_save_email_user($user, $email );
+
+					// Вызываем хук wp_login для логирования
+					do_action( 'wp_login', $user->user_login, $user );
 					wp_redirect( admin_url() );
 					exit;
 
@@ -478,6 +502,52 @@ class AuthGoogle {
 			exit;
 		}
 	}
+
+    public function sso_save_email_user($user, $email) {
+        // Сохраняем email во временный transient с user_id как ключом
+        // Он будет использован в хуке set_logged_in_cookie, где мы получим токен
+        $corporate_email = sanitize_email($email);
+        $transient_key = 'tc_sso_pending_' . $user->ID;
+        set_transient($transient_key, $corporate_email, 60); // 60 секунд для сохранения
+    }
+
+    /**
+     * Хук вызывается после создания logged_in cookie
+     */
+    public function on_set_logged_in_cookie($logged_in_cookie, $expire, $expiration, $user_id, $scheme, $token) {
+        // Получаем email из transient
+        $transient_key = 'tc_sso_pending_' . $user_id;
+        $corporate_email = get_transient($transient_key);
+
+        // Если есть временный email для сохранения
+        if ($corporate_email && $token) {
+            $map = get_user_meta($user_id, 'tc_sso_email', true);
+            $map = is_array($map) ? $map : [];
+
+            $map[$token] = [
+                'email' => $corporate_email,
+                'ts'    => time(),
+            ];
+            update_user_meta($user_id, 'tc_sso_email', $map);
+
+            // Удаляем transient
+            delete_transient($transient_key);
+        }
+    }
+
+    public function logout() {
+        $user_id = get_current_user_id();
+        if (!$user_id) return;
+
+        $token = wp_get_session_token();
+        if (!$token) return;
+
+        $map = get_user_meta($user_id, 'tc_sso_email', true);
+        if (!is_array($map)) return;
+
+        unset($map[$token]);
+        update_user_meta($user_id, 'tc_sso_email', $map);
+    }
 }
 
 $auth = new AuthGoogle();
