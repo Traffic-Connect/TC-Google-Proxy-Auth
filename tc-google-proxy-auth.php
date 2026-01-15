@@ -3,7 +3,7 @@
 /**
  * Plugin Name: TC Google Proxy Auth
  * Description: Авторизация Google в админ панель
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: Traffic Connect
  */
 
@@ -17,6 +17,16 @@ class AuthGoogle {
 	private $managerUrl = '';
 	private $managerToken = '';
 	private $cacheKey = '';
+
+    private $messages = [
+            'cache_error' => 'Система кэширования не получила данные от менеджера.',
+            'not_register_site' => 'Сайт не зарегистрирован в системе управления.',
+            'team_not_check' => 'Команда для данного сайта не определена.',
+            'team_not_level' => 'Обнаружено несоответствие команды. Текущий уровень доступа: ',
+            'error' => 'Произошла непредвиденная ошибка. Обратитесь в службу поддержки.',
+            'email_error' => 'Указан недействительный адрес электронной почты.',
+            'error_not_response' => 'Ответ от системы управления не получен. Выполните очистку кэша и повторите процесс авторизации.'
+    ];
 
 	public function __construct() {
 
@@ -185,9 +195,6 @@ class AuthGoogle {
 			// Get Email
 			$email = $this->decryptToken( $_GET['oauth_token'] );
 
-			// Get Role
-			$role = $this->decryptToken( $_GET['role'] );
-
 			// Get Teams
 			$teams = $this->decryptToken( $_GET['teams'] );
 			$teams = explode( ',', $teams );
@@ -210,13 +217,13 @@ class AuthGoogle {
 
 				// 2. Если в кэше нет данных с софт менеджера
 				if ( $api === false ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The cache did not receive data from the manager.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['cache_error'] ) ) );
 					exit;
 				}
 
 				// 3. Если в кэше нет данных об этом сайте
 				if ( ! isset( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The site is not in the manager software.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['not_register_site'] ) ) );
 					exit;
 				}
 
@@ -235,37 +242,14 @@ class AuthGoogle {
 
 				// 4. Если в кэше нет данных об команде
 				if ( is_null( $api['team'] ) || empty( $api['team'] ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'There is no command assigned to this site in the manager.' ) ) );
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['team_not_check']) ) );
 					exit;
 				}
 
 				if ( empty( $teams ) || ! in_array( $api['team'], $teams ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'The command doesn\'t match. Current access to teams ' . implode( ', ',
+					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( $this->messages['team_not_level'] . implode( ', ',
 								$teams ) ) ) );
 					exit;
-				}
-
-				if ( empty( $role ) ) {
-					wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Role not found' ) ) );
-					exit;
-				}
-
-				if ( $role == 'administrator' ) {
-					$user = get_user_by( 'login', 'administrator' );
-					if ( $user ) {
-						wp_set_auth_cookie( $user->ID, true );
-						wp_redirect( admin_url() );
-						exit;
-					}
-				}
-
-				if ( $role == 'editor' ) {
-					$user = get_user_by( 'login', 'editor' );
-					if ( $user ) {
-						wp_set_auth_cookie( $user->ID, true );
-						wp_redirect( admin_url() );
-						exit;
-					}
 				}
 
 				$user = $this->get_first_user();
@@ -276,12 +260,12 @@ class AuthGoogle {
 
 				}
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Unknown error. Please contact your administrator.' ) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['error']) ) );
 				exit;
 
 			} else {
 
-				wp_redirect( site_url( '/wp-login.php?error=' . urlencode( 'Invalid email.' ) ) );
+				wp_redirect( site_url( '/wp-login.php?error=' . urlencode($this->messages['email_error']) ) );
 				exit;
 
 			}
@@ -355,7 +339,7 @@ class AuthGoogle {
 		if ( is_null( $api ) ) {
 			add_action( 'error_cache_manager_soft', function () {
 				echo '<div class="google-login-error-wrapper">';
-				echo '<span>No data was received from the software manager. Try resetting the cache and retrying authorization.</span>';
+				echo '<span>'.$this->messages['error_not_response'].'</span>';
 				echo '</div>';
 
 				$url = $this->get_current_url_with_param( 'google_clear_cache' );
